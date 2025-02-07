@@ -1,342 +1,448 @@
-# SSO Rails Integration Testing
+# AWS Cognito SSO Rails Integration
 
-This project provides a testing environment for validating the integration between Single Sign-On (SSO) services and a Ruby on Rails application. The setup focuses on secure token generation, encryption, and exchange between services.
+This Rails application implements a secure Single Sign-On (SSO) integration with AWS Cognito, featuring token-based authentication with advanced encryption.
 
-## Components
+## Features
 
-1. **TypeScript SSO Service**: A lightweight Identity Provider (IdP) that:
+### SSO Integration
 
-   - Generates and signs JWT tokens using RSA-256
-   - Encrypts tokens using AES-256-GCM
-   - Provides authentication endpoints
-   - Manages secure token transmission
-   - Implements comprehensive error handling and logging
-   - Includes request validation middleware
+- Seamless authentication with AWS Cognito
+- JWT token validation and verification
+- AES-256-GCM token encryption for secure transmission
+- RSA-256 signature verification
+- User synchronization from Cognito claims
 
-2. **Rails Application**: Includes an SSO module that:
-   - Receives encrypted tokens
-   - Decrypts tokens using the same encryption key
-   - Validates JWT claims
-   - Manages user sessions
+### Security
 
-## Project Structure
-
-```
-.
-├── .tool-versions        # asdf version manager configuration
-├── README.md            # Main project documentation
-├── private.pem          # RSA private key for JWT signing
-├── public.pem           # RSA public key for JWT verification
-└── sso-service/         # TypeScript-based SSO service
-    ├── src/            # Source code
-    │   ├── controllers/
-    │   ├── services/
-    │   ├── middleware/
-    │   └── utils/
-    ├── test/           # Test files
-    ├── terraform/      # Infrastructure as code
-    ├── scripts/        # Utility scripts
-    │   └── setup-env.sh
-    ├── .env           # Environment configuration
-    ├── .env.example   # Environment template
-    ├── package.json   # Node.js dependencies
-    └── tsconfig.json  # TypeScript configuration
-```
+- Secure key management for encryption
+- Environment-based configuration
+- HTTPS enforcement (production)
+- Comprehensive session management
+- Secure token transmission
 
 ## Prerequisites
 
-- Node.js (v20.11.0 via asdf)
-- Ruby (3.2.0 via asdf)
-- Terraform (1.7.0 via asdf)
+- Ruby 3.3.0
+- PostgreSQL
+- Node.js 20.18.1 (for the SSO service)
+- AWS Account with Cognito User Pool
 
-## Detailed Setup Instructions
+## Installation
 
-### 1. Environment Setup
-
-First, ensure you have the correct versions of required tools using asdf:
+1. **Clone the repository**
 
 ```bash
-# Create .tool-versions file
-cat > .tool-versions << EOL
-nodejs 20.11.0
-ruby 3.2.0
-terraform 1.7.0
-EOL
-
-# Install specified versions
-asdf install
+git clone [repository-url]
+cd sso-aws-rails
 ```
 
-### 2. SSO Service Setup
-
-#### a. Install Dependencies
+2. **Install dependencies**
 
 ```bash
-cd sso-service
-npm install
+bundle install
 ```
 
-This installs:
-
-- Express for the web server
-- jsonwebtoken for JWT handling
-- TypeScript and related tools for development
-- AWS SDK for Cognito integration
-
-#### b. Generate RSA Keys for JWT Signing
+3. **Set up configuration files**
 
 ```bash
-# Generate private key
-openssl genrsa -out private.pem 2048
-
-# Generate public key for verification
-openssl rsa -in private.pem -pubout -out public.pem
-```
-
-The private key is used to sign JWTs, while the public key can verify the signature. This asymmetric encryption ensures that tokens can only be created by the authorized SSO service.
-
-#### c. Configure Environment Variables
-
-There are two ways to set up your environment:
-
-1. **Using the Setup Script (Recommended)**:
-
-```bash
-# Make the setup script executable
-chmod +x scripts/setup-env.sh
-
-# Run the setup script
-./scripts/setup-env.sh
-```
-
-The script will:
-
-- Check for the existence of private.pem
-- Create .env from .env.example if it doesn't exist
-- Format and set the JWT_PRIVATE_KEY automatically
-- Generate a secure encryption key
-- Provide guidance for setting other required variables
-
-2. **Manual Setup**:
-
-```bash
-# Copy the example env file
+# Copy example configuration files
 cp .env.example .env
+cp config/database.yml.example config/database.yml
 
-# Generate a secure encryption key
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-
-# Format and set the private key in .env
-# Replace JWT_PRIVATE_KEY with the contents of private.pem
-# Note: The key must be in a single line with \n for newlines
+# Generate encryption keys
+mkdir -p config/keys
+openssl genrsa -out config/keys/private.pem 2048
+openssl rsa -in config/keys/private.pem -pubout -out config/keys/public.pem
 ```
 
-Required environment variables:
-
-- `PORT`: Service port (default: 3000)
-- `JWT_PRIVATE_KEY`: RSA private key for JWT signing
-- `JWT_ISSUER`: Token issuer identifier
-- `JWT_AUDIENCE`: Token audience (Rails app)
-- `ENCRYPTION_KEY`: 64-character hex string (32 bytes) for AES-256-GCM encryption
-- `RAILS_APP_URL`: URL of the Rails application
-- `AWS_REGION`: AWS region for Cognito (e.g., us-east-1)
-- `COGNITO_USER_POOL_ID`: Cognito User Pool ID
-- `COGNITO_CLIENT_ID`: Cognito App Client ID
-- `COGNITO_CLIENT_SECRET`: Cognito App Client Secret
-- `COGNITO_DOMAIN`: Cognito domain URL
-- `COGNITO_CALLBACK_URL`: Callback URL for Cognito authentication
-
-#### d. AWS Cognito Setup
-
-1. **Deploy Cognito Resources**:
+4. **Set up the database**
 
 ```bash
-cd sso-service/terraform
-terraform init
-terraform apply
+rails db:create db:migrate
 ```
 
-2. **Retrieve Cognito Configuration**:
-   After applying Terraform, you'll get outputs for most Cognito values. However, the client secret is marked as sensitive and needs to be retrieved separately:
+## Configuration
+
+### Environment Variables
+
+Update your `.env` file with the following configurations:
+
+```env
+# Rails Application Configuration
+RAILS_ENV=development
+PORT=3000
+
+# Database Configuration
+DATABASE_URL=postgresql://localhost/sso_aws_rails_development
+
+# JWT Configuration
+JWT_ISSUER=cognito-sso-service
+JWT_AUDIENCE=your-rails-app
+
+# AWS Cognito Configuration
+AWS_REGION=us-east-1
+COGNITO_USER_POOL_ID=your-pool-id
+COGNITO_CLIENT_ID=your-client-id
+COGNITO_CLIENT_SECRET=your-client-secret
+```
+
+### Security Keys
+
+1. **RSA Keys**: Used for JWT token signing/verification
+
+   - Located in `config/keys/`
+   - private.pem: JWT signing
+   - public.pem: JWT verification
+
+2. **AES Encryption Key**: Used for token encryption
+   - 32-byte key for AES-256-GCM
+   - Set in environment variables
+
+## Technical Details
+
+### JWT Token Format
+
+The application expects JWTs with the following structure:
+
+```json
+{
+  "header": {
+    "alg": "RS256",
+    "typ": "JWT"
+  },
+  "payload": {
+    "sub": "cognito-user-sub-id",
+    "email": "user@example.com",
+    "given_name": "John",
+    "family_name": "Doe",
+    "iss": "cognito-sso-service",
+    "aud": "your-rails-app",
+    "exp": 1707408000,
+    "iat": 1707404400
+  }
+}
+```
+
+### Token Encryption Process
+
+1. **JWT Generation** (in SSO Service):
+
+```typescript
+// Example JWT token generation
+const token = jwt.sign(payload, privateKey, {
+  algorithm: "RS256",
+  expiresIn: "1h",
+});
+
+// AES-256-GCM encryption
+const iv = crypto.randomBytes(12);
+const cipher = crypto.createCipheriv("aes-256-gcm", aesKey, iv);
+const encrypted = Buffer.concat([cipher.update(token), cipher.final()]);
+const authTag = cipher.getAuthTag();
+
+// Format: base64(iv).base64(authTag).base64(encrypted)
+const encryptedToken = [
+  iv.toString("base64"),
+  authTag.toString("base64"),
+  encrypted.toString("base64"),
+].join(".");
+```
+
+2. **Token Decryption** (in Rails):
+
+```ruby
+# Example decryption in TokenDecryptionService
+def decrypt_aes
+  cipher = OpenSSL::Cipher.new('aes-256-gcm')
+  cipher.decrypt
+  cipher.key = KeyManagementService.aes_encryption_key
+
+  iv, auth_tag, encrypted_data = extract_token_components
+  cipher.iv = iv
+  cipher.auth_tag = auth_tag
+
+  cipher.update(encrypted_data) + cipher.final
+end
+```
+
+### User Synchronization Examples
+
+1. **User Creation from Claims**:
+
+```ruby
+# Example user creation from JWT claims
+user = User.find_or_initialize_by(cognito_sub: claims['sub'])
+user.assign_attributes(
+  email: claims['email'],
+  given_name: claims['given_name'],
+  family_name: claims['family_name'],
+  last_sign_in_at: Time.current
+)
+user.save!
+```
+
+2. **Sample Claims Processing**:
+
+```ruby
+# Example claims processing in UserSynchronizationService
+def process_claims(claims)
+  {
+    cognito_sub: claims['sub'],
+    email: claims['email'],
+    given_name: claims['given_name'],
+    family_name: claims['family_name'],
+    # Additional attributes
+    email_verified: claims['email_verified'],
+    custom_attributes: claims.slice(*CUSTOM_ATTRIBUTE_KEYS)
+  }
+end
+```
+
+## API Examples
+
+### 1. SSO Authentication Flow
+
+#### Request Example:
 
 ```bash
-# Get the client secret
-cd sso-service/terraform
-terraform output -raw cognito_client_secret
+curl -X POST http://localhost:3000/auth/v1/control_plane_sso \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "base64iv.base64authtag.base64encrypteddata",
+    "state": "random-state-string"
+  }'
 ```
 
-3. **Update Environment Variables**:
-   Update your `.env` file with the Cognito configuration:
+#### Success Response:
+
+```json
+{
+  "message": "Authentication successful",
+  "user": {
+    "id": 1,
+    "email": "john.doe@example.com",
+    "given_name": "John",
+    "family_name": "Doe"
+  }
+}
+```
+
+#### Error Response:
+
+```json
+{
+  "error": "Invalid token",
+  "details": "Token has expired"
+}
+```
+
+### 2. Environment Setup Examples
+
+#### Generate AES Key:
 
 ```bash
-COGNITO_USER_POOL_ID=<from terraform output>
-COGNITO_CLIENT_ID=<from terraform output>
-COGNITO_CLIENT_SECRET=<from terraform output -raw cognito_client_secret>
-COGNITO_DOMAIN=<from terraform output>
+# Generate a secure 32-byte key for AES-256-GCM
+openssl rand -hex 32
 ```
 
-### 3. Testing Setup
-
-The project includes comprehensive tests to verify:
-
-- JWT token generation and signing
-- Token encryption/decryption
-- Authentication flow
-
-#### a. Configure Test Environment
+#### Format RSA Private Key for ENV:
 
 ```bash
-# Install test dependencies
-npm install jest ts-jest @types/jest --save-dev
-
-# Create Jest configuration
-# jest.config.js is configured for TypeScript testing
+# Convert private key to single line with \n
+awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}' config/keys/private.pem
 ```
 
-#### b. Run Tests
+## Common Operations
+
+### 1. Key Management
+
+```ruby
+# Example key rotation in KeyManagementService
+class KeyManagementService
+  def self.rotate_aes_key!
+    new_key = SecureRandom.hex(32)
+    old_key = ENV['AES_ENCRYPTION_KEY']
+
+    ENV['AES_ENCRYPTION_KEY'] = new_key
+    ENV['AES_ENCRYPTION_KEY_OLD'] = old_key
+
+    reset_keys!
+  end
+end
+```
+
+### 2. User Session Management
+
+```ruby
+# Example session creation
+def create_user_session(user)
+  session[:user_id] = user.id
+  session[:last_activity] = Time.current
+  session[:expires_at] = 1.hour.from_now
+end
+
+# Example session validation
+def validate_session
+  return false if session[:expires_at].nil? ||
+                 Time.current > session[:expires_at]
+
+  session[:last_activity] = Time.current
+  session[:expires_at] = 1.hour.from_now
+  true
+end
+```
+
+## Testing Examples
+
+### 1. Controller Tests
+
+```ruby
+RSpec.describe Auth::V1::ControlPlaneSsoController, type: :controller do
+  describe 'POST #create' do
+    let(:encrypted_token) { generate_test_token }
+
+    it 'successfully authenticates with valid token' do
+      post :create, params: {
+        token: encrypted_token,
+        state: 'test-state'
+      }
+
+      expect(response).to have_http_status(:ok)
+      expect(json_response[:user]).to include(:email)
+    end
+  end
+end
+```
+
+### 2. Service Tests
+
+```ruby
+RSpec.describe Auth::TokenDecryptionService do
+  describe '#decrypt' do
+    it 'successfully decrypts valid token' do
+      service = described_class.new(encrypted_token)
+      claims = service.decrypt
+
+      expect(claims).to include('sub', 'email')
+    end
+  end
+end
+```
+
+## Troubleshooting Examples
+
+### 1. Token Validation Issues
+
+```ruby
+# Debug token format
+def debug_token_format(encrypted_token)
+  parts = encrypted_token.split('.')
+  unless parts.length == 3
+    raise "Invalid token format. Expected 3 parts, got #{parts.length}"
+  end
+
+  {
+    iv: Base64.decode64(parts[0]).length,
+    auth_tag: Base64.decode64(parts[1]).length,
+    encrypted_data: Base64.decode64(parts[2]).length
+  }
+end
+```
+
+### 2. Database Connection Issues
 
 ```bash
-npm test
+# Check database connection
+RAILS_ENV=development rails dbconsole
+
+# Verify environment variables
+rails runner "puts ENV['DATABASE_URL']"
 ```
 
-Test coverage includes:
+## User Synchronization
 
-- Token generation with proper claims
-- RSA signing verification
-- AES-256-GCM encryption/decryption
-- Error handling for missing keys
-- Token format validation
+The application automatically synchronizes user data from Cognito claims:
 
-### 4. Development Workflow
-
-1. Start the SSO service:
-
-```bash
-npm run dev
-```
-
-2. Test SSO Authentication:
-
-   - Visit `http://localhost:3000/auth/login` in your browser
-   - You will be redirected to the Cognito hosted UI
-   - After successful authentication, you'll be redirected back with an encrypted token
-
-3. Verify token format and encryption:
-   - Check JWT structure (header.payload.signature)
-   - Verify encryption format (IV + ciphertext + auth tag)
-   - Validate token claims
+- Creates/updates users based on Cognito information
+- Maintains user attributes (email, name, etc.)
+- Tracks last sign-in time
 
 ## Security Considerations
 
-1. **Key Management**:
+1. **Key Management**
 
-   - Private keys are never committed to version control
-   - Secure encryption key generation and storage
-   - Environment variables for sensitive data
+   - Store encryption keys securely
+   - Use environment variables for sensitive data
+   - Rotate keys periodically
 
-2. **Token Security**:
+2. **Token Security**
 
+   - AES-256-GCM encryption for token transmission
    - RSA-256 for JWT signing
-   - AES-256-GCM for token encryption
    - Short token expiration times
 
-3. **Best Practices**:
+3. **Environment Security**
    - HTTPS enforcement in production
    - Secure headers configuration
-   - Proper error handling and logging
+   - Session timeout management
 
-## Testing Strategy
+## Development
 
-1. **Unit Tests**:
+### Running the Application
 
-   - Token generation and signing
-   - Encryption/decryption
-   - Claim validation
+```bash
+# Start the Rails server
+rails server
 
-2. **Integration Tests**:
+# Run tests
+rspec
+```
 
-   - End-to-end token flow
-   - Error scenarios
-   - Concurrent token encryption
-   - Configuration validation
-   - Error handling validation
+### Adding New Features
 
-3. **Test Coverage Requirements**:
-   - Minimum 80% branch coverage
-   - Minimum 80% function coverage
-   - Minimum 80% line coverage
-   - Minimum 80% statement coverage
+1. Create a feature branch
+2. Write tests
+3. Implement the feature
+4. Submit a pull request
 
-## Error Handling
+## Testing
 
-The project implements a comprehensive error handling system:
+```bash
+# Run all tests
+bundle exec rspec
 
-1. **Custom Error Types**:
-
-   - `BaseError`: Foundation for all custom errors
-   - `AuthenticationError`: For authentication-related issues (401)
-   - `ValidationError`: For request validation failures (400)
-   - `ConfigurationError`: For environment/setup issues (500)
-   - `EncryptionError`: For encryption failures (500)
-
-2. **Global Error Handler**:
-
-   - Centralized error processing
-   - Consistent error response format
-   - Automatic status code mapping
-   - Detailed error logging
-
-3. **Request Validation**:
-   - Express-validator integration
-   - Pre-request payload validation
-   - Custom validation rules
-   - Detailed validation error messages
-
-## Logging System
-
-The project uses Winston for structured logging:
-
-1. **Log Levels**:
-
-   - ERROR: For critical issues and exceptions
-   - WARN: For potential issues and validation failures
-   - INFO: For important operations and state changes
-   - DEBUG: For detailed debugging information
-
-2. **Log Format**:
-
-   - Timestamp
-   - Log level
-   - Structured JSON output
-   - Request context where applicable
-   - Error stack traces for debugging
-
-3. **Environment-specific Configuration**:
-   - Production: INFO level with essential details
-   - Development: DEBUG level with full context
-   - Test: ERROR level for test runs
+# Run specific tests
+bundle exec rspec spec/controllers/auth/v1/control_plane_sso_controller_spec.rb
+```
 
 ## Troubleshooting
 
-Common issues and solutions:
+### Common Issues
 
-1. **JWT Signing Errors**:
+1. **Token Validation Errors**
 
-   - Verify private key format (PEM format with proper headers)
-   - Check algorithm specification (RS256)
-   - Validate key permissions
+   - Check JWT issuer and audience configuration
+   - Verify RSA key pair matches
+   - Ensure token hasn't expired
 
-2. **Encryption Issues**:
-   - Ensure encryption key is exactly 64 hex characters (32 bytes)
-   - Verify encryption key format
-   - Check for proper IV and auth tag handling
+2. **Encryption Issues**
+
+   - Verify AES key length (32 bytes)
+   - Check encryption format (IV + ciphertext + auth tag)
+
+3. **User Synchronization Problems**
+   - Verify Cognito claims format
+   - Check database constraints
+   - Review user attribute mapping
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
-MIT License - See LICENSE file for details
+This project is licensed under the MIT License - see the LICENSE file for details.
