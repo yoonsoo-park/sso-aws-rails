@@ -10,7 +10,19 @@ Rails.application.routes.draw do
 
   namespace :auth do
     namespace :v1 do
-      post 'control_plane_sso', to: 'control_plane_sso#create'
+      match 'control_plane_sso', to: 'control_plane_sso#create', via: [:get, :post]
+      delete 'control_plane_sso', to: 'control_plane_sso#destroy'
+    end
+
+    # Add routes for success and error pages
+    get 'success', to: 'pages#success'
+    get 'error', to: 'pages#error'
+  end
+
+  # Add a protected resource route for testing
+  namespace :api do
+    namespace :v1 do
+      get '/protected-resource', to: 'protected_resource#show'
     end
   end
 end

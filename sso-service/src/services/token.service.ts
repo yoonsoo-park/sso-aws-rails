@@ -27,7 +27,7 @@ export const generateToken = async (claims: TokenClaims): Promise<string> => {
     {
       ...claims,
       iss: process.env.JWT_ISSUER || "sso-service",
-      aud: process.env.JWT_AUDIENCE || "rails-app",
+      aud: process.env.COGNITO_CLIENT_ID,
       exp: Math.floor(Date.now() / 1000) + 60 * 60, // 1 hour expiration
     },
     privateKey,

@@ -17,11 +17,21 @@ module Auth
         @aes_encryption_key ||= begin
           # In production, this should come from a secure key management service
           # For testing, we'll use an environment variable
-          raw_key = ENV['AES_ENCRYPTION_KEY']
+          raw_key = ENV['ENCRYPTION_KEY']
           raise KeyError, "Missing AES encryption key" unless raw_key
           
-          # Convert the hex string to binary if needed
-          raw_key.length == 64 ? [raw_key].pack('H*') : raw_key
+          Rails.logger.debug "Raw encryption key length: #{raw_key.length} characters"
+          
+          # Convert hex string to binary
+          begin
+            binary_key = [raw_key].pack('H*')
+            Rails.logger.debug "Converted to binary key (#{binary_key.bytesize} bytes)"
+            binary_key
+          rescue ArgumentError => e
+            Rails.logger.error "Failed to convert encryption key from hex: #{e.message}"
+            Rails.logger.error "Raw key: #{raw_key}"
+            raise KeyError, "Invalid encryption key format: must be a hex string"
+          end
         end
       end
 

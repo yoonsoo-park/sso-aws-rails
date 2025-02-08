@@ -19,8 +19,15 @@ export async function encryptToken(token: string): Promise<string> {
   }
 
   try {
+    logger.debug("Starting token encryption");
+    logger.debug(`Key (hex): ${ENCRYPTION_KEY}`);
+    logger.debug(`Key length: ${keyBuffer.length} bytes`);
+
     const iv = randomBytes(12);
+    logger.debug(`Generated IV (hex): ${iv.toString("hex")}`);
+
     const cipher = createCipheriv(ALGORITHM, keyBuffer, iv);
+    cipher.setAAD(Buffer.from("")); // Set empty auth data to match Ruby
 
     const encryptedBuffer = Buffer.concat([
       cipher.update(token, "utf8"),
@@ -28,12 +35,32 @@ export async function encryptToken(token: string): Promise<string> {
     ]);
 
     const authTag = cipher.getAuthTag();
+    logger.debug(`Auth Tag (hex): ${authTag.toString("hex")}`);
+    logger.debug(`Encrypted data length: ${encryptedBuffer.length} bytes`);
 
-    // Combine IV, encrypted data, and auth tag
-    const result = Buffer.concat([iv, encryptedBuffer, authTag]);
+    // Format: base64(iv).base64(authTag).base64(encrypted)
+    const encryptedToken = [
+      iv.toString("base64"),
+      authTag.toString("base64"),
+      encryptedBuffer.toString("base64"),
+    ].join(".");
 
-    logger.debug("Token encrypted successfully");
-    return result.toString("base64");
+    logger.debug("Token components:");
+    logger.debug(
+      ` - IV (base64): ${iv.toString("base64")} (${iv.length} bytes)`
+    );
+    logger.debug(
+      ` - Auth Tag (base64): ${authTag.toString("base64")} (${
+        authTag.length
+      } bytes)`
+    );
+    logger.debug(
+      ` - Encrypted (base64): ${encryptedBuffer
+        .toString("base64")
+        .substring(0, 64)}... (${encryptedBuffer.length} bytes)`
+    );
+
+    return encryptedToken;
   } catch (error) {
     logger.error("Encryption error:", { error });
     throw new EncryptionError("Failed to encrypt token");
@@ -49,13 +76,17 @@ export async function decryptToken(encryptedToken: string): Promise<string> {
   }
 
   try {
-    // Convert base64 to buffer
-    const encryptedBuffer = Buffer.from(encryptedToken, "base64");
+    // Split the token into its components
+    const [ivBase64, authTagBase64, encryptedBase64] =
+      encryptedToken.split(".");
+    if (!ivBase64 || !authTagBase64 || !encryptedBase64) {
+      throw new Error("Invalid token format");
+    }
 
-    // Extract IV (12 bytes), auth tag (16 bytes), and encrypted data
-    const iv = encryptedBuffer.subarray(0, 12);
-    const authTag = encryptedBuffer.subarray(encryptedBuffer.length - 16);
-    const encrypted = encryptedBuffer.subarray(12, encryptedBuffer.length - 16);
+    // Convert base64 components to buffers
+    const iv = Buffer.from(ivBase64, "base64");
+    const authTag = Buffer.from(authTagBase64, "base64");
+    const encrypted = Buffer.from(encryptedBase64, "base64");
 
     // Create decipher
     const decipher = createDecipheriv(ALGORITHM, keyBuffer, iv);

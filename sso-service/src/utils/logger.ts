@@ -1,17 +1,21 @@
 import winston from "winston";
 
 const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || "info",
+  level: "debug",
   format: winston.format.combine(
     winston.format.timestamp(),
-    winston.format.json()
+    winston.format.colorize(),
+    winston.format.printf(({ level, message, timestamp, ...meta }) => {
+      let logMessage = `${timestamp} ${level}: ${message}`;
+      if (Object.keys(meta).length > 0) {
+        logMessage += `\n${JSON.stringify(meta, null, 2)}`;
+      }
+      return logMessage;
+    })
   ),
   transports: [
     new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-      ),
+      level: "debug",
     }),
   ],
 });

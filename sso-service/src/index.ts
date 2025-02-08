@@ -1,11 +1,12 @@
-import express from "express";
 import dotenv from "dotenv";
+// Configure dotenv before any other imports
+dotenv.config();
+
+import express from "express";
 import cors from "cors";
 import { authRouter } from "./controllers/auth.controller";
 import { errorHandler } from "./middleware/error.middleware";
 import logger from "./utils/logger";
-
-dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
