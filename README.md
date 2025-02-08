@@ -490,31 +490,41 @@ end
 
 ### 1. Token Validation Issues
 
-```ruby
-# Debug token format
-def debug_token_format(encrypted_token)
-  parts = encrypted_token.split('.')
-  unless parts.length == 3
-    raise "Invalid token format. Expected 3 parts, got #{parts.length}"
-  end
+#### AES Decryption and JWT Validation Debug Process
 
-  {
-    iv: Base64.decode64(parts[0]).length,
-    auth_tag: Base64.decode64(parts[1]).length,
-    encrypted_data: Base64.decode64(parts[2]).length
-  }
-end
-```
+1. **Issue Identification**
 
-### 2. Database Connection Issues
+   - Initial error: AES decryption failing without specific error message
+   - Secondary error: JWT validation failing due to issuer mismatch
 
-```bash
-# Check database connection
-RAILS_ENV=development rails dbconsole
+2. **Debug Steps Taken**
 
-# Verify environment variables
-rails runner "puts ENV['DATABASE_URL']"
-```
+   - Added detailed logging in TypeScript encryption service
+
+     - Logged encryption key in hex format
+     - Logged IV and auth tag generation
+     - Logged token components in both hex and base64
+
+   - Enhanced Rails decryption service logging
+
+     - Added hex format logging of key components
+     - Improved token component extraction logging
+     - Added detailed error messages for decryption process
+
+   - Resolved JWT issuer mismatch
+     - Updated JWT issuer configuration to match between services
+     - Ensured consistent audience value using Cognito client ID
+
+3. **Key Findings**
+
+   - AES encryption/decryption working correctly with proper logging
+   - JWT validation succeeded after aligning issuer configuration
+   - Successful user authentication and session creation
+
+4. **Solution Implementation**
+   - Aligned JWT issuer configuration between services
+   - Maintained consistent encryption key handling
+   - Added comprehensive logging for future debugging
 
 ## User Synchronization
 
